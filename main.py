@@ -32,6 +32,15 @@ def read_checked_png(path):
         raise ValueError("entry.png does not start with the PNG signature")
     if not blob.endswith(PNG_TAIL):
         raise ValueError("entry.png is truncated: the IEND chunk is missing")
+    # Also check the IHDR chunk itself: the length field must be 13, the
+    # chunk type must read "IHDR", and the colour type (byte 9 of the
+    # chunk data) must be one PNG defines (0, 2, 3, 4 or 6). A file that
+    # merely starts with the PNG signature could otherwise slip through.
+    ihdr_len = struct.unpack(">I", blob[8:12])[0]
+    if ihdr_len != 13 or blob[12:16] != b"IHDR":
+        raise ValueError("entry.png has a malformed IHDR chunk")
+    if blob[25] not in (0, 2, 3, 4, 6):
+        raise ValueError(f"entry.png has unknown PNG colour type {blob[25]}")
     width, height = struct.unpack(">II", blob[16:24])
     if width > PIXEL_LIMIT or height > PIXEL_LIMIT:
         raise ValueError(f"entry.png is {width}x{height}, over the 1024 px cap")
